@@ -12,111 +12,30 @@ html,body{
 </style>
 </head>
 <body>
-<textarea class="textfield" id="input" placeholder="入力用"></textarea>
+<label>追加の人名:<input type="text" id="extnames" style="width:90%;"placeholder="追加で伏字にしたい人名があれば指定してください"/></label><br/>
+<textarea class="textfield" id="input" placeholder="入力"></textarea>
 <button style="vertical-align:top;" id="sanitize">-></button>
 <textarea class="textfield" id="output" placeholder="結果"></textarea>
 <script src="//code.jquery.com/jquery-3.1.0.min.js"   integrity="sha256-cCueBR6CsyA4/9szpPfrX3s49M9vUU5BgtiJj06wt/s="   crossorigin="anonymous"></script>
 <script src="//code.jquery.com/ui/1.12.1/jquery-ui.min.js"   integrity="sha256-VazP97ZCwtekAsvgPBSUwPFKdrwD3unUfSGVYrahUqU="   crossorigin="anonymous"></script>
 <script src="./js/kuromoji/kuromoji.js" type="text/javascript"></script>
+<script src="./js/sanitize.js" type="text/javascript"></script>
 <script type="text/javascript">
 (function($){
-	var __filters = [
-		{
-			"pos_detail_1":"接尾",
-			"pos_detail_2":"地域"
-		},
-		{
-			"pos_detail_1":"固有名詞",
-			"pos_detail_2":"地域",
-			"pos_detail_3":"一般"
-		},{
-			"pos_detail_1":"固有名詞",
-			"pos_detail_2":"人名"
-		}
-	];
-	function _needs_filtered(token){
-		return __filters.some(function(elm){
-			var ret = true;
-			for(var k in elm){
-				if(elm[k] != token[k]){
-					return false;
-				}
-			}
-			return ret;
-		});
-	}
-	
-	var __tokenizer = null;
-	var __ready_queue = null;
-	function _get_tokenizer(){
-		return new Promise(function(resolve, reject){
-			if(__tokenizer){
-				resolve(__tokenizer)
-			}else{
-				var __handler = function(err,tokenizer){
-					if(err){
-						reject(err);
-					}else{
-						resolve(tokenizer);
-					}
-				};
-				if(__ready_queue){
-					__ready_queue.push(__handler);
-				}else{
-					__ready_queue = [__handler];
-					kuromoji.builder({ dicPath:"./js/kuromoji/dict/" }).build(function (err, tokenizer) {
-					    __tokenizer = tokenizer;
-						__ready_queue.forEach(function(handler){
-					    	handler(err, tokenizer);
-					    });
-					    __ready_queue = null;
-					});
-				}
-			}
-		});
-	}
 	$(document).ready(function(){
-		$(".textfield").height($(window).height() - 30);
+		$(".textfield").height($(window).height() - 20 - $("#input").position().top);
 		$("button#sanitize").click(function(){
 			var txt = $("#input").val();
+			var extnames = $("#extnames").val();
 			if(txt){
 				$("#output").val("").prop("placeholder","変換中...")
-				_get_tokenizer().then(function(tokenizer){
-					var tokens = tokenizer.tokenize(txt);
-					var offs = nextoffs = 0;
-					function _get_start_idx(token){
-						return offs + token.word_position - 1;
-					}
-					var output = txt;
-					tokens = tokens.map(function(token){
-						if(_get_start_idx(token) != nextoffs){
-							offs = nextoffs;
-						}
-						var startidx = _get_start_idx(token)
-						nextoffs = startidx + token.surface_form.length;
-						var needfilter = _needs_filtered(token);
-						if(needfilter){
-							output = output.slice(0, startidx) + token.surface_form.replace(/./g,"●") + output.slice(nextoffs);
-						}
-						return $.extend({
-							"_needs_filtered": needfilter,
-							"_start_idx": startidx
-							},token);
-					});
-					function _sanitize_text(itxt, rexp){
-						var matches = itxt.match(rexp);
-						if(matches){
-							matches.forEach(function(mtch){
-								itxt = itxt.replace(mtch, mtch.replace(/./g, "●"));
-							})
-						}
-						return itxt;
-					}
-					output = _sanitize_text(output,/(\d|[０-９])+[-ー](\d|[０-９])+[-ー](\d|[０-９])+[-ー](\d|[０-９])+/g);
-					output = _sanitize_text(output,/(\d|[０-９])+[-ー](\d|[０-９])+[-ー](\d|[０-９])+/g);
-					output = _sanitize_text(output,/(\d|[０-９])+[-ー](\d|[０-９])+/g);
-					output = _sanitize_text(output,/[\w_-]+@[\w\.-]+\.\w{2,}/g);
-					$("#output").val(output).prop("placeholder","結果");
+				sanitize_text({
+					"extfilters": extnames ? extnames.split(",").map(function(nm){
+						return new RegExp(nm.trim(), "g");
+					}) : undefined,
+					"text":txt
+				}).then(function(res){
+					$("#output").val(res.result).prop("placeholder", "結果");
 				}).catch(function(err){
 					console.log("failed to load tokenizer: " + err);
 				});
