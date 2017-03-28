@@ -54,7 +54,8 @@ html,body{
 		});
 	});
 	$("#sanitize").click(function(){
-		$(this).prop("disabled",true);
+		var self = $(this);
+		self.prop("disabled",true);
 		_append_msg("変換中...","loading");
 		function _clear_fs(fs){
 			var reader = fs.root.createReader();
@@ -75,44 +76,57 @@ html,body{
 		var totalsize = files.reduce(function(prev,cur){
 			return prev + cur.size;
 		},0);
-		window.webkitRequestFileSystem(window.PERSISTENT, totalsize * 2, function(fs){
-			_clear_fs(fs);
-			var extnames = $("#extnames").val();
-			files.forEach(function(file){
-				var reader = new FileReader();
-				reader.onload = function(e){
-					sanitize_text({
-						"extfilters": extnames ? extnames.split(",").map(function(nm){
-							return new RegExp(nm.trim(), "g");
-						}) : undefined,
-						"text":e.target.result
-					}).then(function(res){
-						fs.root.getFile(file.name, {
-							"create": true,
-							"exclusive": false
-						}, function(outfile){
-							outfile.createWriter(function(fwriter){
-								fwriter.onwriteend = function(e){
-									_append_msg("<a target='_blank' href='filesystem:" + location.origin + "/persistent/" + file.name + "'>" + file.name + " - done. </a>", "info");
-								};
-								fwriter.onerror = function(e){
-									_append_msg(file.name + " - error on writing: "+ e, "error");
-								};
-								var bb = new Blob([res.result], {"type": "text/plain"});
-								fwriter.write(bb);
+		(new Promise(function(resolve, reject){
+			window.webkitRequestFileSystem(window.PERSISTENT, totalsize * 2, function(fs){
+				_clear_fs(fs);
+				var extnames = $("#extnames").val();
+				var rem = files.length;
+				files.forEach(function(file){
+					var reader = new FileReader();
+					reader.onload = function(e){
+						sanitize_text({
+							"extfilters": extnames ? extnames.split(",").map(function(nm){
+								return new RegExp(nm.trim(), "g");
+							}) : undefined,
+							"text":e.target.result
+						}).then(function(res){
+							fs.root.getFile(file.name, {
+								"create": true,
+								"exclusive": false
+							}, function(outfile){
+								outfile.createWriter(function(fwriter){
+									fwriter.onwriteend = function(e){
+										_append_msg("<a target='_blank' href='filesystem:" + location.origin + "/persistent/" + file.name + "'>" + file.name + " - done. </a>", "info");
+									};
+									fwriter.onerror = function(e){
+										_append_msg(file.name + " - error on writing: "+ e, "error");
+									};
+									var bb = new Blob([res.result], {"type": "text/plain"});
+									fwriter.write(bb);
+								});
+							},function(e){
+								_append_msg(file.name + " - error on getting output file: " + e);
 							});
-						},function(e){
-							_append_msg(file.name + " - error on getting output file: " + e);
+							rem --;
+							if(0 == rem){
+								resolve(files.length);
+							}
+						}).catch(function(err){
+							_append_msg(file.name + " - error on tokeinze: " + err, "error");
 						});
-					}).catch(function(err){
-						_append_msg(file.name + " - error on tokeinze: " + err, "error");
-					});
-				};
-				reader.readAsText(file);
+					};
+					reader.readAsText(file);
+				});
+			},function(e){
+				reject("" + e);
 			});
-		},function(e){
-			_append_msg("" + e, "error");
+		})).then(function(num){
+			self.prop("disabled",false);
+		}).catch(function(errmsg){
+			self.prop("disabled",false);
+			_append_msg(errmsg, "error");
 		});
+
 	});
 })(jQuery);
 
