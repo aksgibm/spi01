@@ -13,10 +13,10 @@ html,body{
 </head>
 <body>
 <label>追加の人名:<input type="text" id="extnames" style="width:90%;"placeholder="追加で伏字にしたい人名があれば指定してください"/></label><br/>
-<label>入力フォルダ<input type="file" webkitdirectory directory id="infolder"/></label>
-<label>出力フォルダ<input type="file" webkitdirectory directory id="outfolder"/></label>
+<label>入力フォルダ：<input type="file" webkitdirectory directory id="infolder"/></label>
 <button style="vertical-align:top;" id="sanitize">変換</button>
-<div id="output">結果</div>
+<div><label>入力ファイル：<ul id="files"></ul></label></div>
+<label>結果：<div id="output"></div></label>
 <script src="//code.jquery.com/jquery-3.1.0.min.js"   integrity="sha256-cCueBR6CsyA4/9szpPfrX3s49M9vUU5BgtiJj06wt/s="   crossorigin="anonymous"></script>
 <script src="//code.jquery.com/ui/1.12.1/jquery-ui.min.js"   integrity="sha256-VazP97ZCwtekAsvgPBSUwPFKdrwD3unUfSGVYrahUqU="   crossorigin="anonymous"></script>
 <script src="./js/kuromoji/kuromoji.js" type="text/javascript"></script>
@@ -25,54 +25,91 @@ html,body{
 (function($){
 	var infolder = null;
 	var outfolder = null;
+	var removeprev = false;
 	function _append_msg(msg, level){
+		if(removeprev){
+			$("#output").empty();
+			removeprev = false;
+		}
 		$("<div/>",{
 			"class":"msg" + (level ? " " + level : "")
 		}).html(msg).appendTo($("#output"));
+		if("loading" == level){
+			removeprev = true;
+		}
+	}
+	var files = null;
+	function _is_conversion_available(){
+		return files && files.length;
+	}
+	function _validate_sanitlize_button(){
+		$("#sanitize").prop("disabled", !_is_conversion_available());
 	}
 	$("#infolder").on("change", function(){
-		var files = this.files;
-		var totalsize = files.reduce(function(prev,cur){
-			return (prev || 0) + cur.size;
-		}); 
-		window.requestFileSystem(window.PERSISTENT, totalsize * 2, function(fs){
-			var output = $("#output").empty();
-			var extnames = $("#extnames").val();
-			for(var i = 0; i < files.length;i++){
-				(function(file){
-					var reader = new FileReader();
-					reader.onload = function(e){
-						sanitize_text({
-							"extfilters": extnames ? extnames.split(",").map(function(nm){
-								return new RegExp(nm.trim(), "g");
-							}) : undefined,
-							"text":e.target.result
-						}).then(function(res){
-							fs.root.getFile(file.name, {
-								"create": true,
-								"exclusive": false
-							}, function(outfile){
-								outfile.createWriter(function(fwriter){
-									fwriter.onwriteend = function(e){
-										_append_msg(file.name + " - done.", "info");
-									};
-									fwriter.onerror = function(e){
-										_append_msg(file.name + " - error on writing: "+ e, "error");
-									};
-									var bb = new BlobBuilder();
-									bb.append(res.result);
-									fwriter.write(bb.getBlob("text/plain"));
-								});
-							},function(e){
-								_append_msg(file.name + " - error on getting output file: " + e);
+		files = Array.prototype.slice.call(this.files);
+		_validate_sanitlize_button();
+		$("#files").empty();
+		files.forEach(function(file){
+			return $("<li/>").html(file.name).appendTo($("#files"));
+		});
+	});
+	$("#sanitize").click(function(){
+		$(this).prop("disabled",true);
+		_append_msg("変換中...","loading");
+		function _clear_fs(fs){
+			var reader = fs.root.createReader();
+			var __read = function(){
+				reader.readEntries(function(results){
+					if(results.length){
+						Array.prototype.slice.call(results).forEach(function(file){
+							file.remove(function(){
+								//console.log("removed");
 							});
-						}).catch(function(err){
-							_append_msg(file.name + " - error on tokeinze: " + err, "error");
 						});
-					};
-					reader.readAsText(file);
-				})(files[i]);
-			}
+						__read();
+					}
+				});
+			};
+			__read();
+		}
+		var totalsize = files.reduce(function(prev,cur){
+			return prev + cur.size;
+		},0);
+		window.webkitRequestFileSystem(window.PERSISTENT, totalsize * 2, function(fs){
+			_clear_fs(fs);
+			var extnames = $("#extnames").val();
+			files.forEach(function(file){
+				var reader = new FileReader();
+				reader.onload = function(e){
+					sanitize_text({
+						"extfilters": extnames ? extnames.split(",").map(function(nm){
+							return new RegExp(nm.trim(), "g");
+						}) : undefined,
+						"text":e.target.result
+					}).then(function(res){
+						fs.root.getFile(file.name, {
+							"create": true,
+							"exclusive": false
+						}, function(outfile){
+							outfile.createWriter(function(fwriter){
+								fwriter.onwriteend = function(e){
+									_append_msg("<a target='_blank' href='filesystem:" + location.origin + "/persistent/" + file.name + "'>" + file.name + " - done. </a>", "info");
+								};
+								fwriter.onerror = function(e){
+									_append_msg(file.name + " - error on writing: "+ e, "error");
+								};
+								var bb = new Blob([res.result], {"type": "text/plain"});
+								fwriter.write(bb);
+							});
+						},function(e){
+							_append_msg(file.name + " - error on getting output file: " + e);
+						});
+					}).catch(function(err){
+						_append_msg(file.name + " - error on tokeinze: " + err, "error");
+					});
+				};
+				reader.readAsText(file);
+			});
 		},function(e){
 			_append_msg("" + e, "error");
 		});
