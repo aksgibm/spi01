@@ -11,6 +11,9 @@
 		},{
 			"pos_detail_1":"固有名詞",
 			"pos_detail_2":"人名"
+		},{
+			"pos_detail_1":"固有名詞",
+			"pos_detail_2":"組織"
 		}
 	];
 	function _needs_filtered(token){
