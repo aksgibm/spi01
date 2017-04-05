@@ -79,42 +79,42 @@ html,body{
 			var totalsize = files.reduce(function(prev,cur){
 				return prev + cur.size;
 			},0);
-			window.webkitRequestFileSystem(window.PERSISTENT, totalsize * 2, function(fs){
-				_clear_fs(fs);
-				var extnames = $("#extnames").val();
-				var rem = files.length;
-				if(!rem){
-					resolve(rem);
-				}
-				var zip = new JSZip();
-				files.forEach(function(file){
-					var reader = new FileReader();
-					reader.onload = function(e){
-						sanitize_text({
-							"extfilters": extnames ? extnames.split(",").map(function(nm){
-								return new RegExp(nm.trim(), "g");
-							}) : undefined,
-							"text":e.target.result
-						}).then(function(res){
-							if(opt.onresult){
-								opt.onresult(fs, file.name, res.result);
-							}
-							rem --;
-							if(0 == rem){
-								if(opt.onfinish){
-									opt.onfinish(fs);
+			navigator.webkitPersistentStorage.requestQuota(totalsize * 2, function(grantedBytes){
+				window.webkitRequestFileSystem(window.PERSISTENT, grantedBytes, function(fs){
+					_clear_fs(fs);
+					var extnames = $("#extnames").val();
+					var rem = files.length;
+					if(!rem){
+						resolve(rem);
+					}
+					var zip = new JSZip();
+					files.forEach(function(file){
+						var reader = new FileReader();
+						reader.onload = function(e){
+							sanitize_text({
+								"extfilters": extnames ? extnames.split(",").map(function(nm){
+									return new RegExp(nm.trim(), "g");
+								}) : undefined,
+								"text":e.target.result
+							}).then(function(res){
+								if(opt.onresult){
+									opt.onresult(fs, file.name, res.result);
 								}
-								resolve(files.length);
-							}
-						}).catch(function(err){
-							_append_msg(file.name + " - error on tokeinze: " + err, "error");
-						});
-					};
-					reader.readAsText(file);
-				});
-			},function(e){
-				reject("" + e);
-			});
+								rem --;
+								if(0 == rem){
+									if(opt.onfinish){
+										opt.onfinish(fs);
+									}
+									resolve(files.length);
+								}
+							}).catch(function(err){
+								_append_msg(file.name + " - error on tokeinze: " + err, "error");
+							});
+						};
+						reader.readAsText(file);
+					});
+				},reject);
+			}, reject);
 		});
 	}
 	$("#sanitize").click(function(){
