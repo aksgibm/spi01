@@ -28,6 +28,18 @@ html,body{
 	var infolder = null;
 	var outfolder = null;
 	var removeprev = false;
+	
+	var outchr = "○";
+	if(window.location.search){
+		window.location.search.replace(/^\?/,"").split("&").some(function(prm){
+			var mt = prm.match(/(outchr=)(.+)/);
+			if(mt){
+				outchr = decodeURIComponent(mt[2]);
+			}
+			return mt;
+		});
+	}
+
 	function _append_msg(msg, level){
 		if(removeprev){
 			$("#output").empty();
@@ -92,6 +104,7 @@ html,body{
 						var reader = new FileReader();
 						reader.onload = function(e){
 							sanitize_text({
+								"outchr":outchr,
 								"extfilters": extnames ? extnames.split(",").map(function(nm){
 									return new RegExp(nm.trim(), "g");
 								}) : undefined,

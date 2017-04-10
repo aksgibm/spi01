@@ -23,6 +23,17 @@ html,body{
 <script type="text/javascript">
 (function($){
 	$(document).ready(function(){
+		var outchr = "○";
+		if(window.location.search){
+			window.location.search.replace(/^\?/,"").split("&").some(function(prm){
+				var mt = prm.match(/(outchr=)(.+)/);
+				if(mt){
+					outchr = decodeURIComponent(mt[2]);
+				}
+				return mt;
+			});
+		}
+		
 		$(".textfield").height($(window).height() - 20 - $("#input").position().top);
 		$("button#sanitize").click(function(){
 			var txt = $("#input").val();
@@ -30,6 +41,7 @@ html,body{
 			if(txt){
 				$("#output").val("").prop("placeholder","変換中...")
 				sanitize_text({
+					"outchr":outchr,
 					"extfilters": extnames ? extnames.split(",").map(function(nm){
 						return new RegExp(nm.trim(), "g");
 					}) : undefined,
