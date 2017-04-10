@@ -60,7 +60,7 @@
 var _sanitize = function(option){
 	var opt = option || {};
 	var txt = opt.text;
-	var outchr = opt.outchr || "●";
+	var outchr = opt.outchr || "○";//○〇
 	return new Promise(function(resolve, reject){
 		_get_tokenizer().then(function(tokenizer){
 			var tokens = tokenizer.tokenize(txt);
