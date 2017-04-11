@@ -16,6 +16,7 @@ html,body{
 <label>入力フォルダ：<input type="file" webkitdirectory directory id="infolder"/></label>
 <button style="vertical-align:top;" id="sanitize">変換</button>
 <button style="vertical-align:top;" id="sanitize_compress">変換+圧縮</button>
+<label style="display:block;"><input type="checkbox" id="sanitlize_filename" checked/>ファイル名も匿名化する</label>
 <div><label>入力ファイル：<ul id="files"></ul></label></div>
 <label>結果：<div id="output"></div></label>
 <script src="//code.jquery.com/jquery-3.1.0.min.js"   integrity="sha256-cCueBR6CsyA4/9szpPfrX3s49M9vUU5BgtiJj06wt/s="   crossorigin="anonymous"></script>
@@ -52,6 +53,9 @@ html,body{
 			removeprev = true;
 		}
 	}
+	function _should_sanitilze_filename(){
+		return $("#sanitlize_filename").prop("checked");
+	}
 	var files = null;
 	function _is_conversion_available(){
 		return files && files.length;
@@ -85,13 +89,32 @@ html,body{
 		};
 		__read();
 	}
+	function _get_output_filename(name){
+		var mtch = name.match(/(.+)(\.\w+$)/);
+		var extnames = $("#extnames").val();
+		return new Promise(function(resolve,reject){
+			if(mtch && _should_sanitilze_filename()){
+				sanitize_text({
+					"outchr": outchr,
+					"extfilters": extnames ? extnames.split(",").map(function(nm){
+						return new RegExp(nm.trim(), "g");
+					}) : undefined,
+					"text":mtch[1]
+				}).then(function(res){
+					resolve(res.result + (mtch[2] || ""));
+				}).catch(reject);
+			}else{
+				resolve(name);
+			}
+		});
+	}
 	function _sanitize_files(options){
 		var opt = options || {};
 		return new Promise(function(resolve, reject){
 			var totalsize = files.reduce(function(prev,cur){
 				return prev + cur.size;
 			},0);
-			navigator.webkitPersistentStorage.requestQuota(totalsize * 2, function(grantedBytes){
+			navigator.webkitPersistentStorage.requestQuota(Math.round(totalsize * 1.2), function(grantedBytes){
 				window.webkitRequestFileSystem(window.PERSISTENT, grantedBytes, function(fs){
 					_clear_fs(fs);
 					var extnames = $("#extnames").val();
@@ -135,23 +158,27 @@ html,body{
 		self.prop("disabled",true);
 		_append_msg("変換中...","loading");
 		_sanitize_files({
-			"onresult": function(fs, name, result){
-				fs.root.getFile(name, {
-					"create": true,
-					"exclusive": false
-				}, function(outfile){
-					outfile.createWriter(function(fwriter){
-						fwriter.onwriteend = function(e){
-							_append_msg("<a target='_blank' href='filesystem:" + location.origin + "/persistent/" + name + "'>" + name + " - done. </a>", "info");
-						};
-						fwriter.onerror = function(e){
-							_append_msg(name + " - error on writing: "+ e, "error");
-						};
-						var bb = new Blob([result], {"type": "text/plain"});
-						fwriter.write(bb);
+			"onresult": function(fs, orgname, result){
+				_get_output_filename(orgname).then(function(name){
+					fs.root.getFile(name, {
+						"create": true,
+						"exclusive": false
+					}, function(outfile){
+						outfile.createWriter(function(fwriter){
+							fwriter.onwriteend = function(e){
+								_append_msg("<a target='_blank' href='filesystem:" + location.origin + "/persistent/" + name + "'>" + name + " - done. </a>", "info");
+							};
+							fwriter.onerror = function(e){
+								_append_msg(name + " - error on writing: "+ e, "error");
+							};
+							var bb = new Blob([result], {"type": "text/plain"});
+							fwriter.write(bb);
+						});
+					},function(e){
+						_append_msg(name + " - error on getting output file: " + e);
 					});
-				},function(e){
-					_append_msg(name + " - error on getting output file: " + e);
+				}).catch(function(err){
+					_append_msg(orgname + " - error on getting output file name: " + err);
 				});
 			}
 		}).then(function(num){
@@ -179,34 +206,56 @@ html,body{
 		self.prop("disabled",true);
 		_append_msg("変換+圧縮中...","loading");
 		var zip = new JSZip();
+		var __inflight = 0;
+		var __need_finalize = null;
 		_sanitize_files({
-			"onresult": function(fs, name, result){
-				zip.file(name, result);
+			"onresult": function(fs, orgname, result){
+				__inflight ++;
+				_get_output_filename(orgname).then(function(name){
+					zip.file(name, result);
+					__inflight --;
+					if(!__inflight && __need_finalize){
+						__need_finalize();
+					}
+				}).catch(function(err){
+					_append_msg(orgname + " - error on getting output file name: " + e);
+					__inflight --;
+					if(!__inflight && __need_finalize){
+						__need_finalize();
+					}
+				});
 			},
 			"onfinish": function(fs){
-				var zipname = _fmt_date(new Date(), "YYYYMMDDThhmmss") + ".zip";
-				fs.root.getFile(zipname, {
-					"create": true,
-					"exclusive": false
-				}, function(zipfile){
-					zipfile.createWriter(function(fwriter){
-						fwriter.onwriteend = function(e){
-							_append_msg("<a target='_blank' href='filesystem:" + location.origin + "/persistent/" + zipname + "'>" + zipname + " - done. </a>", "info");
-						}
-						fwriter.onerror = function(e){
-							_append_msg(zipname + " - error on writing: "+ e, "error");
-						};
-						zip.generateAsync({
-							"compression": "DEFLATE",
-							"type":"blob"
-						})
-						.then(function(bb){
-							fwriter.write(bb);
+				var finalize = function(){
+					var zipname = _fmt_date(new Date(), "YYYYMMDDThhmmss") + ".zip";
+					fs.root.getFile(zipname, {
+						"create": true,
+						"exclusive": false
+					}, function(zipfile){
+						zipfile.createWriter(function(fwriter){
+							fwriter.onwriteend = function(e){
+								_append_msg("<a target='_blank' href='filesystem:" + location.origin + "/persistent/" + zipname + "'>" + zipname + " - done. </a>", "info");
+							}
+							fwriter.onerror = function(e){
+								_append_msg(zipname + " - error on writing: "+ e, "error");
+							};
+							zip.generateAsync({
+								"compression": "DEFLATE",
+								"type":"blob"
+							})
+							.then(function(bb){
+								fwriter.write(bb);
+							});
 						});
+					},function(e){
+						_append_msg(zipname + " - error on getting output file: " + e);
 					});
-				},function(e){
-					_append_msg(zipname + " - error on getting output file: " + e);
-				});
+				};
+				if(__inflight){
+					__need_finalize = finalize;
+				}else{
+					finalize();
+				}
 			}
 		}).then(function(num){
 			self.prop("disabled",false);
