@@ -16,6 +16,11 @@ html,body{
 <label>入力フォルダ：<input type="file" webkitdirectory directory id="infolder"/></label>
 <button style="vertical-align:top;" id="sanitize">変換</button>
 <button style="vertical-align:top;" id="sanitize_compress">変換+圧縮</button>
+<label style="display:block;">入力文字コード<select id="encoding">
+	<option value="utf-8" selected>UTF-8</option>
+	<option value="shift-jis">Shift-JIS</option>
+	<option value="euc-jp">EUC</option>
+</select></label>
 <label style="display:block;"><input type="checkbox" id="sanitlize_filename" checked/>ファイル名も匿名化する</label>
 <label style="display:block;"><input type="checkbox" id="trim_elm_header" checked/>elmファイルのヘッダを削除しtxtファイルにする</label>
 <div><label>入力ファイル：<ul id="files"></ul></label></div>
@@ -138,11 +143,17 @@ html,body{
 					if(!rem){
 						resolve(rem);
 					}
+					if(opt.onstart){
+						opt.onstart(files.length);
+					}
 					files.forEach(function(file){
 						var reader = new FileReader();
 						reader.onload = function(e){
 							var text = e.target.result;
 							var filename = file.name;
+							if(opt.onread){
+								opt.onread(filename);
+							}
 							var mtch = filename.match(/(.+)(\.\w+$)/);
 							if(mtch && ".eml" == mtch[2] && opt.trimeml){
 								var date = _get_eml_date(text);
@@ -170,7 +181,7 @@ html,body{
 								_append_msg(file.name + " - error on tokeinze: " + err, "error");
 							});
 						};
-						reader.readAsText(file);
+						reader.readAsText(file, opt.encoding);
 					});
 				},reject);
 			}, reject);
@@ -182,6 +193,7 @@ html,body{
 		_append_msg("変換中...","loading");
 		var extnames = $("#extnames").val()
 		_sanitize_files({
+			"encoding": $("#encoding").val(),
 			"trimeml": _should_trim_elmheader(),
 			"extnames": extnames,
 			"onresult": function(fs, orgname, result){
@@ -238,13 +250,18 @@ html,body{
 		var __need_finalize = null;
 		var extnames = $("#extnames").val();
 		_sanitize_files({
+			"encoding": $("#encoding").val(),
 			"trimeml": _should_trim_elmheader(),
 			"extnames": extnames,
+			"onread": function(filename){
+				_append_msg("変換中[" + filename + "]...");
+			},
 			"onresult": function(fs, orgname, result){
 				__inflight ++;
 				_get_output_filename(orgname,{
 					"extnames": extnames
 				}).then(function(name){
+					_append_msg("圧縮中[" + orgname + "]...")
 					zip.file(name, result);
 					__inflight --;
 					if(!__inflight && __need_finalize){
