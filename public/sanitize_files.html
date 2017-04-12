@@ -17,6 +17,7 @@ html,body{
 <button style="vertical-align:top;" id="sanitize">変換</button>
 <button style="vertical-align:top;" id="sanitize_compress">変換+圧縮</button>
 <label style="display:block;"><input type="checkbox" id="sanitlize_filename" checked/>ファイル名も匿名化する</label>
+<label style="display:block;"><input type="checkbox" id="trim_elm_header" checked/>elmファイルのヘッダを削除しtxtファイルにする</label>
 <div><label>入力ファイル：<ul id="files"></ul></label></div>
 <label>結果：<div id="output"></div></label>
 <script src="//code.jquery.com/jquery-3.1.0.min.js"   integrity="sha256-cCueBR6CsyA4/9szpPfrX3s49M9vUU5BgtiJj06wt/s="   crossorigin="anonymous"></script>
@@ -56,6 +57,9 @@ html,body{
 	function _should_sanitilze_filename(){
 		return $("#sanitlize_filename").prop("checked");
 	}
+	function _should_trim_elmheader(){
+		return $("#trim_elm_header").prop("checked");
+	}
 	var files = null;
 	function _is_conversion_available(){
 		return files && files.length;
@@ -89,9 +93,9 @@ html,body{
 		};
 		__read();
 	}
-	function _get_output_filename(name){
+	function _get_output_filename(name, opt){
 		var mtch = name.match(/(.+)(\.\w+$)/);
-		var extnames = $("#extnames").val();
+		var extnames = opt.extnames;
 		return new Promise(function(resolve,reject){
 			if(mtch && _should_sanitilze_filename()){
 				sanitize_text({
@@ -108,6 +112,18 @@ html,body{
 			}
 		});
 	}
+	function _trim_eml_headers(txt){
+		return txt.replace(/^[\s\S]+------_=_NextPart[\w_\.]+\s+Content-Type:\s+text\/plain\s+/,"")
+			.replace(/------_=_NextPart[\w_\.]+\s+Content-Type[\s\S]+$/,"");
+	}
+	function _get_eml_date(txt){
+		var mtch = txt.match(/(Date:\s)(.+)/);
+		if(mtch && mtch.length > 2){
+			return new Date(mtch[2]);
+		}else{
+			return null;
+		}
+	}
 	function _sanitize_files(options){
 		var opt = options || {};
 		return new Promise(function(resolve, reject){
@@ -117,24 +133,31 @@ html,body{
 			navigator.webkitPersistentStorage.requestQuota(Math.round(totalsize * 1.2), function(grantedBytes){
 				window.webkitRequestFileSystem(window.PERSISTENT, grantedBytes, function(fs){
 					_clear_fs(fs);
-					var extnames = $("#extnames").val();
+					var extnames = opt.extnames;
 					var rem = files.length;
 					if(!rem){
 						resolve(rem);
 					}
-					var zip = new JSZip();
 					files.forEach(function(file){
 						var reader = new FileReader();
 						reader.onload = function(e){
+							var text = e.target.result;
+							var filename = file.name;
+							var mtch = filename.match(/(.+)(\.\w+$)/);
+							if(mtch && ".eml" == mtch[2] && opt.trimeml){
+								var date = _get_eml_date(text);
+								text = _trim_eml_headers(text);
+								filename = mtch[1] + (date ? "[" + date.getTime() + "]" : "") + ".txt";
+							}
 							sanitize_text({
 								"outchr":outchr,
 								"extfilters": extnames ? extnames.split(",").map(function(nm){
 									return new RegExp(nm.trim(), "g");
 								}) : undefined,
-								"text":e.target.result
+								"text":text
 							}).then(function(res){
 								if(opt.onresult){
-									opt.onresult(fs, file.name, res.result);
+									opt.onresult(fs, filename, res.result);
 								}
 								rem --;
 								if(0 == rem){
@@ -157,9 +180,14 @@ html,body{
 		var self = $(this);
 		self.prop("disabled",true);
 		_append_msg("変換中...","loading");
+		var extnames = $("#extnames").val()
 		_sanitize_files({
+			"trimeml": _should_trim_elmheader(),
+			"extnames": extnames,
 			"onresult": function(fs, orgname, result){
-				_get_output_filename(orgname).then(function(name){
+				_get_output_filename(orgname, {
+					"extnames": extnames
+				}).then(function(name){
 					fs.root.getFile(name, {
 						"create": true,
 						"exclusive": false
@@ -208,10 +236,15 @@ html,body{
 		var zip = new JSZip();
 		var __inflight = 0;
 		var __need_finalize = null;
+		var extnames = $("#extnames").val();
 		_sanitize_files({
+			"trimeml": _should_trim_elmheader(),
+			"extnames": extnames,
 			"onresult": function(fs, orgname, result){
 				__inflight ++;
-				_get_output_filename(orgname).then(function(name){
+				_get_output_filename(orgname,{
+					"extnames": extnames
+				}).then(function(name){
 					zip.file(name, result);
 					__inflight --;
 					if(!__inflight && __need_finalize){
