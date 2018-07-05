@@ -54,6 +54,11 @@ window["sanitize_text_jspos"] = (option)=>{
 		result = _sanitize_reg(result, /(\d|[０-９])+[-ー](\d|[０-９])+[-ー](\d|[０-９])+/g);
 		result = _sanitize_reg(result, /(\d|[０-９])+[-ー](\d|[０-９])+/g);
 		result = _sanitize_reg(result, /[\w_-]+@[\w\.-]+\.\w{2,}/g);
+		if(opt.extfilters){
+			opt.extfilters.forEach(function(fltr){
+				result = _sanitize_reg(result,fltr);
+			});
+		}
 		resolve({"result": result});
 	});
 };
