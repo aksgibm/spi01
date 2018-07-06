@@ -13,7 +13,8 @@ html,body{
 </head>
 <body>
 <div id="hearder">
-	<label>Additional Words:<input type="text" id="extnames" style="width:90%;"placeholder="add words that should be converted (delimit with ,)"/></label><br/>
+	<label>Additional Words:<input type="text" id="extnames" style="width:80%;"placeholder="add words that should be converted (delimit with ,)"/></label><br/>
+	<label><input id="trycapit" type="checkbox"/>try capitalized words</label>
 </div>
 <div id="contents">
 	<textarea class="textfield" id="input" placeholder="put text here."></textarea>
@@ -47,6 +48,7 @@ html,body{
 			if(txt){
 				$("#output").val("").prop("placeholder","converting...")
 				sanitize_text_jspos({
+					"trycapit": $("#trycapit").prop("checked"),
 					"outchr":outchr,
 					"extfilters": extnames ? extnames.split(",").map(function(nm){
 						return new RegExp(nm.trim(), "g");

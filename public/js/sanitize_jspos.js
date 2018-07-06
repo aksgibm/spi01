@@ -28,7 +28,7 @@ window["sanitize_text_jspos"] = (option)=>{
 	function _replace_at(ln, rplc, idx){
 		return ln.substr(0, idx) + rplc + ln.substr(idx + rplc.length);
 	}
-	function _sanitize_pos(ln){
+	function _sanitize_pos(ln, capitalize){
 		const words = new Lexer().lex(ln);
 		const words_idx = _estimate_index(ln, words);
 		const tags = new POSTagger().tag(words);
@@ -37,6 +37,17 @@ window["sanitize_text_jspos"] = (option)=>{
 				ln = _replace_at(ln, elm[0].replace(/./g, outchr), words_idx[idx].idx);
 			}
 		});
+		if(capitalize){
+			const capts = words.map((elm)=>{
+				return elm.charAt(0).toUpperCase() + elm.slice(1);
+			});
+			const ctags = new POSTagger().tag(capts);
+			ctags.forEach((elm,idx)=>{
+				if(-1 != __filters.indexOf(elm[1])){
+					ln = _replace_at(ln, elm[0].replace(/./g, outchr), words_idx[idx].idx);
+				}
+			});
+		}
 		return ln;
 	};
 	function _sanitize_reg(itxt, rexp){
@@ -49,7 +60,7 @@ window["sanitize_text_jspos"] = (option)=>{
 		return itxt;
 	}
 	return new Promise((resolve,reject)=>{
-		var result = _sanitize_pos(text);
+		var result = _sanitize_pos(text, opt.trycapit);
 		result = _sanitize_reg(result, /(\d|[０-９])+[-ー\/](\d|[０-９])+[-ー\/](\d|[０-９])+[-ー\/](\d|[０-９])+/g);
 		result = _sanitize_reg(result, /(\d|[０-９])+[-ー\/](\d|[０-９])+[-ー\/](\d|[０-９])+/g);
 		result = _sanitize_reg(result, /(\d|[０-９])+[-ー\/](\d|[０-９])+/g);
