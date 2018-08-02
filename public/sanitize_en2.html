@@ -1,0 +1,82 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+	<link href="//code.jquery.com/ui/1.12.1/themes/black-tie/jquery-ui.css" rel="stylesheet" type="text/css" />
+<style type="text/css">
+html,body{
+	font-family:'Lucida Grande','Hiragino Kaku Gothic ProN', 'ヒラギノ角ゴ ProN W3',Meiryo, メイリオ, sans-serif;
+}
+.textfield{
+	width:45%;
+}
+</style>
+</head>
+<body>
+<div id="hearder">
+	<label>Additional Words:<input type="text" id="extnames" style="width:80%;"placeholder="add words that should be converted (delimit with ,)"/></label><br/>
+	<label><input id="month" type="checkbox"/>remove month</label>
+	<label><input id="dow" type="checkbox"/>remove day of week</label>
+</div>
+<div id="contents">
+	<textarea class="textfield" id="input" placeholder="put text here."></textarea>
+	<button style="vertical-align:top;" id="sanitize">-></button>
+	<textarea class="textfield" id="output" placeholder="result"></textarea>
+</div>
+<script src="//code.jquery.com/jquery-3.1.0.min.js"   integrity="sha256-cCueBR6CsyA4/9szpPfrX3s49M9vUU5BgtiJj06wt/s="   crossorigin="anonymous"></script>
+<script src="//code.jquery.com/ui/1.12.1/jquery-ui.min.js"   integrity="sha256-VazP97ZCwtekAsvgPBSUwPFKdrwD3unUfSGVYrahUqU="   crossorigin="anonymous"></script>
+<script src="./js/jspos/lexer.js" type="text/javascript"></script>
+<script src="./js/jspos/lexicon.js_" type="text/javascript"></script>
+<script src="//unpkg.com/compromise@11.12.0/builds/compromise.min.js" type="text/javascript"></script>
+<script src="./js/sanitize_compromise.js" type="text/javascript"></script>
+<script type="text/javascript">
+(function($){
+	const __regexp_month=/January|Jan\.|February|Feb\.|March|Mar\.|April|Apr\.|May|June|Jun\.|July|Jul\.|August|Aug\.|September|Sept\.|Sep\.|October|Oct\.|November|Nov\.|December|Dec\./ig;
+	const __regexp_dow=/Monday|Mon\.|Tuesday|Tue\.|Tues\.|Wednesday|Wed\.|Thursday|Thurs\.|Thur\.|Thu\.|Friday|Fri\.|Saturday|Sat\.|Sunday|Sun\./ig;
+
+	$(document).ready(function(){
+		var outchr = "*";
+		if(window.location.search){
+			window.location.search.replace(/^\?/,"").split("&").some(function(prm){
+				var mt = prm.match(/(outchr=)(.+)/);
+				if(mt){
+					outchr = decodeURIComponent(mt[2]);
+				}
+				return mt;
+			});
+		}
+		
+		$(".textfield").height($(window).height() - 20 - $("#input").position().top);
+		$("button#sanitize").click(function(){
+			var txt = $("#input").val();
+			var extfilters = ($("#extnames").val() || "").split(",").map(function(elm){
+				const nm = elm.trim();
+				return nm ? new RegExp(nm, "g") : null;
+			});
+			if($("#month").prop("checked")){
+				extfilters.push(__regexp_month);
+			}
+			if($("#dow").prop("checked")){
+				extfilters.push(__regexp_dow);
+			}
+			if(txt){
+				$("#output").val("").prop("placeholder","converting...")
+				sanitize_text_compromise({
+					"outchr":outchr,
+					"extfilters": extfilters.filter((elm)=>{
+						return elm;
+					}),
+					"text":txt
+				}).then(function(res){
+					$("#output").val(res.result).prop("placeholder", "result");
+				}).catch(function(err){
+					console.log("failed to load tokenizer: " + err);
+				});
+				
+			}
+		});
+	});
+})(jQuery);
+
+</script>
+</body>
+</html>
