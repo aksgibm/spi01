@@ -1,0 +1,32 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>scrapewiki bookmarklet</title>
+</head>
+<body>
+<ol>
+<li>make the link below as bookmark. (e.g. drag to bookmark bar)</li>
+<li>click the bookmark from some page to go to e-attendance.(except url starting from file://)</li>
+<li>click the bookmark on e-attendance input page to set random values for work hours</li>
+</ol>
+<a id="scrape_acronyms">scrape acronyms</a><br/>
+<script type="text/javascript">
+function _get_injection_script(path){
+	txt = "" + function(d,s){
+		s = d.createElement("script");
+		s.type = "text/javascript";
+		s.src = ["URL_TOBE_REPLACED",Date.now()].join("?");
+		d.body.appendChild(s);
+	};
+	return txt.replace("URL_TOBE_REPLACED", path);
+}
+document.getElementById("scrape_acronyms").href = "javascript:("
+		+ _get_injection_script(((path)=>{
+			var a = document.createElement("a");
+			a.href = path;
+			return a.href;
+		})("js/scrape_acronyms.js"))
+		+")(document)";
+</script>
+</body>
