@@ -1,7 +1,7 @@
 (($)=>{
 
 function _needs_filtered(tags){
-	return tags.Noun && (tags.ProperNoun || tags.Place || tags.Region || tags.FirstName || tags.LastName || tags.Organization || tags.Acronym);
+	return tags.Noun && (tags.ProperNoun || tags.Place || tags.Region || tags.FirstName || tags.LastName || tags.Organization || tags.Acronym || tags.Sensitive);
 }
 
 window["sanitize_text_compromise"] = (option)=>{

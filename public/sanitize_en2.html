@@ -44,7 +44,12 @@ html,body{
 				return mt;
 			});
 		}
-		
+		$.getJSON("./js/dict/us_navy_acronyms.json", (data)=>{
+			nlp.plugin(data);
+		});
+		$.getJSON("./js/dict/us_univ_col_acronyms.json", (data)=>{
+			nlp.plugin(data);
+		});
 		$(".textfield").height($(window).height() - 20 - $("#input").position().top);
 		$("button#sanitize").click(function(){
 			var txt = $("#input").val();

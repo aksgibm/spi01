@@ -11,6 +11,7 @@
 <li>click the bookmark on e-attendance input page to set random values for work hours</li>
 </ol>
 <a id="scrape_acronyms">scrape acronyms</a><br/>
+<a id="acronyms_to_plugin">make plugin json</a>
 <script type="text/javascript">
 function _get_injection_script(path){
 	txt = "" + function(d,s){
@@ -28,5 +29,12 @@ document.getElementById("scrape_acronyms").href = "javascript:("
 			return a.href;
 		})("js/scrape_acronyms.js"))
 		+")(document)";
+document.getElementById("acronyms_to_plugin").href = "javascript:("
+	+ _get_injection_script(((path)=>{
+		var a = document.createElement("a");
+		a.href = path;
+		return a.href;
+	})("js/acronyms_to_plugin.js"))
+	+")(document)";
 </script>
 </body>
