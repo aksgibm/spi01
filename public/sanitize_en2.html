@@ -14,8 +14,8 @@ html,body{
 <body>
 <div id="hearder">
 	<label>Additional Words:<input type="text" id="extnames" style="width:80%;"placeholder="add words that should be converted (delimit with ,)"/></label><br/>
-	<label><input id="month" type="checkbox"/>remove month</label>
-	<label><input id="dow" type="checkbox"/>remove day of week</label>
+	<label><input id="date" type="checkbox" tag="Date"/>remove date</label>
+<!-- 	<label><input id="dow" type="checkbox"/>remove day of week</label> -->
 </div>
 <div id="contents">
 	<textarea class="textfield" id="input" placeholder="put text here."></textarea>
@@ -33,6 +33,7 @@ html,body{
 	const __regexp_month=/January|Jan\.|February|Feb\.|March|Mar\.|April|Apr\.|May|June|Jun\.|July|Jul\.|August|Aug\.|September|Sept\.|Sep\.|October|Oct\.|November|Nov\.|December|Dec\./ig;
 	const __regexp_dow=/Monday|Mon\.|Tuesday|Tue\.|Tues\.|Wednesday|Wed\.|Thursday|Thurs\.|Thur\.|Thu\.|Friday|Fri\.|Saturday|Sat\.|Sunday|Sun\./ig;
 
+	const _deffilters = [];
 	$(document).ready(function(){
 		var outchr = "*";
 		if(window.location.search){
@@ -44,22 +45,32 @@ html,body{
 				return mt;
 			});
 		}
-		$.getJSON("./js/dict/us_navy_acronyms.json", (data)=>{
+		$.getJSON("./js/dict/us_cities_by_population.json", (data)=>{
+			nlp.plugin(data);
+			for(var k in data.words){
+				if(k.match(/\s/)){
+					_deffilters.push(k);
+				}
+			}
+		});
+		/*$.getJSON("./js/dict/us_navy_acronyms.json", (data)=>{
 			nlp.plugin(data);
 		});
 		$.getJSON("./js/dict/us_univ_col_acronyms.json", (data)=>{
 			nlp.plugin(data);
-		});
+		});*/
+
 		$(".textfield").height($(window).height() - 20 - $("#input").position().top);
 		$("button#sanitize").click(function(){
 			var txt = $("#input").val();
-			var extfilters = ($("#extnames").val() || "").split(",").map(function(elm){
+			var extfilters = _deffilters.concat(($("#extnames").val() || "").split(",").map(function(elm){
 				const nm = elm.trim();
 				return nm ? new RegExp(nm, "g") : null;
+			}));
+			const tagsfiltered = $("input[tag][type='checkbox']:checked").get().map((elm)=>{
+				return $(elm).attr("tag");
 			});
-			if($("#month").prop("checked")){
-				extfilters.push(__regexp_month);
-			}
+			
 			if($("#dow").prop("checked")){
 				extfilters.push(__regexp_dow);
 			}
@@ -67,6 +78,7 @@ html,body{
 				$("#output").val("").prop("placeholder","converting...")
 				sanitize_text_compromise({
 					"outchr":outchr,
+					"tagsfiltered":tagsfiltered,
 					"extfilters": extfilters.filter((elm)=>{
 						return elm;
 					}),

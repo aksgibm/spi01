@@ -1,0 +1,3 @@
+//scrape from https://en.wikipedia.org/wiki/List_of_United_States_cities_by_population
+
+JSON.stringify($($("#mw-content-text table.wikitable.sortable").get(0)).find("tr").get().map((elm)=>{return $(elm).find("td:eq(1)").get(0);}).filter((elm)=>{return elm;}).map((elm)=>{return $(elm).find("a[title]").text().trim();}));
